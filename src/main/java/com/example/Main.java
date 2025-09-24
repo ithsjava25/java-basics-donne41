@@ -50,6 +50,7 @@ public class Main {
     }
 
     private static void zoneInput(String arg) {
+        arg = arg.toUpperCase();
         try {
             zone = zoneChoise.valueOf(arg).toString();
         }catch (IllegalArgumentException e) {
