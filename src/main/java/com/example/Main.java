@@ -21,9 +21,9 @@ public class Main {
     static double avePrice = 0;
     static double sumPrice = 0;
 
-
+//TODO getHighLow skriver ut för många gånger. Slå ut den printer metoder från gethighLow
+//TODO get a sorted list from the zone, date acending in price.
     private static void sortedList() {
-        //TODO get a sorted list from the zone, date acending in price.
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
         elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh));
         pricePrinter(elPrisLista);
@@ -46,7 +46,6 @@ public class Main {
         }
         ;
         validDate = true;
-        //todo set the calldate and call back to get list.
     }
 
     private static void zoneInput(String arg) {
@@ -66,11 +65,8 @@ public class Main {
         //TODO Och en sträng som samtidigt kollar input värdet, tex datumet, elzonen.
         //TODO --sorting ska ta datum och presentera dagen alla priser i fallade ordning.
         //APIn fattade inte LocalDate format, tvunget med parse toString.
-        String[] validArgs = {"--help", "--zone", "--date", "--sorted"};
-        //List<String> validZone = Arrays.asList("SE1", "SE2", "SE3", "SE4");
         enum zone {SE1, SE2, SE3, SE4}
         String inputZone = null;
-        //String validDate = "202";
 
         if (args.length == 0) {
             System.out.println("Start argument är tom, startar manuell inmatning." +
