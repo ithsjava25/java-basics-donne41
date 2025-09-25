@@ -15,6 +15,7 @@ public class Main {
     public static boolean validZone;
     public static boolean validDate;
     public static boolean callSorted;
+    static DateTimeFormatter hourFormatter = DateTimeFormatter.ofPattern("HH");
     enum zoneChoise {SE1, SE2, SE3, SE4}
 
 
@@ -75,11 +76,13 @@ public class Main {
         validDate = false;
         callSorted = false;
 
+
         if (args.length == 0) {
             helpPrint();
             return;
         } else {
             for (int i = 0; i < args.length; i++) {
+                try{
                 switch (args[i].toLowerCase()) {
                     case "--help" -> {
                         helpPrint();
@@ -88,6 +91,8 @@ public class Main {
                     case "--sorted" -> callSorted = true;
                     case "--zone" -> zoneInput(args[i + 1]);
                     case "--date" -> dateInput(args[i + 1]);
+                }}catch(ArrayIndexOutOfBoundsException e){
+                    System.out.println("Found --date argument but no date.");
                 }
             }
         }
@@ -111,7 +116,7 @@ public class Main {
     private static List getPriceList(String callDate, String zone) {
         List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, com.example.api.ElpriserAPI.Prisklass.valueOf(zone));
         if (testPriser.size() == 0) {
-            System.out.println("Inga priser funna.");
+            System.out.println("No data found online.");
             return Collections.emptyList();
         }
         return testPriser;
@@ -123,11 +128,11 @@ public class Main {
         double avePrice;
         double sumPrice = 0;
         double highPris = copy.getFirst().sekPerKWh();
-        String highPrisTidStart = copy.getFirst().timeStart().toLocalTime().toString().substring(0, 2);
-        var highPrisTidSlut = copy.getFirst().timeEnd().toLocalTime().toString().substring(0, 2);
+        String highPrisTidStart = copy.getFirst().timeStart().format(hourFormatter);
+        var highPrisTidSlut = copy.getFirst().timeEnd().format(hourFormatter);
         var lowPris = copy.getLast().sekPerKWh();
-        var lowPrisTidStart = copy.getLast().timeStart().toLocalTime().toString().substring(0, 2);
-        var lowPrisTidSlut = copy.getLast().timeEnd().toLocalTime().toString().substring(0, 2);
+        var lowPrisTidStart = copy.getLast().timeStart().format(hourFormatter);
+        var lowPrisTidSlut = copy.getLast().timeEnd().format(hourFormatter);
         for (int i = 0; i < copy.size(); i++) {
             sumPrice += copy.get(i).sekPerKWh();
         }
@@ -152,7 +157,7 @@ public class Main {
         elpriser.stream().forEach(pris ->
                 System.out.printf("""
                                 %s-%s %.2f öre\n""",
-                        pris.timeStart().toLocalTime().toString().substring(0, 2), pris.timeEnd().toLocalTime().toString().substring(0, 2), pris.sekPerKWh() * 100)
+                        pris.timeStart().format(hourFormatter), pris.timeEnd().format(hourFormatter), pris.sekPerKWh() * 100)
         );
     }
 
