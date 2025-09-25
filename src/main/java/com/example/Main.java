@@ -28,17 +28,15 @@ public class Main {
     //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
     private static void sortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
         highestLowPrice result = getPriceHighLow(elPrisLista);
         highLowAvePrinter(result);
         pricePrinter(elPrisLista);
     }
     private static void unSortedList(){
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
         highestLowPrice result = getPriceHighLow(elPrisLista);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::timeStart));
         highLowAvePrinter(result);
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::timeStart));
         pricePrinter(elPrisLista);
     }
 
@@ -50,7 +48,6 @@ public class Main {
             System.out.println("Invalid date, using todays date instead");
             callDate = LocalDate.now().toString();
         }
-        ;
         validDate = true;
     }
 
@@ -87,9 +84,9 @@ public class Main {
                         helpPrint();
                         return;
                     }
+                    case "--sorted" -> callSorted = true;
                     case "--zone" -> zoneInput(args[i + 1]);
                     case "--date" -> dateInput(args[i + 1]);
-                    case "--sorted" -> callSorted = true;
                 }
 
             }
@@ -98,9 +95,11 @@ public class Main {
             sortedList();
             return;
 
+        }else if(validZone && callSorted) {
+            sortedList();
         } else if (validZone && validDate != callSorted) {
             unSortedList();
-        }else {
+        }else{
             helpPrint();
             return;
         }
@@ -112,7 +111,7 @@ public class Main {
     //todo borde kunna återanvända en av metoderna.
     private static List getPriceList(String callDate, String zone) {
         List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
-        if (testPriser.size() == 0) {
+        if (testPriser.isEmpty()) {
             callDate = LocalDate.now().toString();
             testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
 
@@ -121,18 +120,20 @@ public class Main {
     }
 
     private static highestLowPrice getPriceHighLow(List<ElpriserAPI.Elpris> elpriser) {
-        double highPris = elpriser.getFirst().sekPerKWh();
-        String highPrisTidStart = elpriser.getFirst().timeStart().toLocalTime().toString().substring(0, 2);
-        var highPrisTidSlut = elpriser.getFirst().timeEnd().toLocalTime().toString().substring(0, 2);
-        var lowPris = elpriser.getLast().sekPerKWh();
-        var lowPrisTidStart = elpriser.getLast().timeStart().toLocalTime().toString().substring(0, 2);
-        var lowPrisTidSlut = elpriser.getLast().timeEnd().toLocalTime().toString().substring(0, 2);
-        for (int i = 0; i < elpriser.size(); i++) {
-            sumPrice += elpriser.get(i).sekPerKWh();
+        List<ElpriserAPI.Elpris> copy = new ArrayList<>(elpriser);
+        copy.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
+        double highPris = copy.getFirst().sekPerKWh();
+        String highPrisTidStart = copy.getFirst().timeStart().toLocalTime().toString().substring(0, 2);
+        var highPrisTidSlut = copy.getFirst().timeEnd().toLocalTime().toString().substring(0, 2);
+        var lowPris = copy.getLast().sekPerKWh();
+        var lowPrisTidStart = copy.getLast().timeStart().toLocalTime().toString().substring(0, 2);
+        var lowPrisTidSlut = copy.getLast().timeEnd().toLocalTime().toString().substring(0, 2);
+        for (int i = 0; i < copy.size(); i++) {
+            sumPrice += copy.get(i).sekPerKWh();
         }
         //fixa tiden så att start och slut tiden är tex 01-02 istället för 01:00-02:00
         //skriv ut i öre istället för kr.
-        avePrice = sumPrice / elpriser.size();
+        avePrice = sumPrice / copy.size();
         double highPrisOre = highPris * 100;
         double lowPrisOre = lowPris * 100;
         double avePrisOre = avePrice * 100;
