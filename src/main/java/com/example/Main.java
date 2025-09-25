@@ -12,16 +12,12 @@ public class Main {
     public static final ElpriserAPI elAPI = new ElpriserAPI();
     public static String zone = null;
     public static String callDate = null;
-    public static boolean validInput = false;
     public static boolean validZone = false;
     public static boolean validDate = false;
-    public static boolean validArg = false;
     public static boolean callSorted = false;
 
     enum zoneChoise {SE1, SE2, SE3, SE4}
 
-    static double avePrice = 0;
-    static double sumPrice = 0;
 
     public record highestLowPrice(double highPrisOre, String highPrisTidStart, String highPrisTidSlut,
                                   double lowPrisOre, String lowPrisTidStart, String lowPrisTidSlut, double avePrisOre) {
@@ -32,7 +28,7 @@ public class Main {
     //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
     private static void sortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        if(elPrisLista.size() == 0){
+        if (elPrisLista.size() == 0) {
             return;
         }
         highestLowPrice result = getPriceHighLow(elPrisLista);
@@ -43,7 +39,7 @@ public class Main {
 
     private static void unSortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        if(elPrisLista.size() == 0){
+        if (elPrisLista.size() == 0) {
             return;
         }
         highestLowPrice result = getPriceHighLow(elPrisLista);
@@ -98,7 +94,7 @@ public class Main {
         }
         if (!validZone) {
             helpPrint();
-        } else if(validDate && callSorted) {
+        } else if (validDate && callSorted) {
             sortedList();
         } else if (validDate != callSorted) {
             unSortedList();
@@ -122,6 +118,8 @@ public class Main {
     private static highestLowPrice getPriceHighLow(List<ElpriserAPI.Elpris> elpriser) {
         List<ElpriserAPI.Elpris> copy = new ArrayList<>(elpriser);
         copy.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
+        double avePrice;
+        double sumPrice = 0;
         double highPris = copy.getFirst().sekPerKWh();
         String highPrisTidStart = copy.getFirst().timeStart().toLocalTime().toString().substring(0, 2);
         var highPrisTidSlut = copy.getFirst().timeEnd().toLocalTime().toString().substring(0, 2);
