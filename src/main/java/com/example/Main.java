@@ -21,18 +21,24 @@ public class Main {
     static double avePrice = 0;
     static double sumPrice = 0;
 
+    public record highestLowPrice ( double highPrisOre, String highPrisTidStart, String highPrisTidSlut, double lowPrisOre, String lowPrisTidStart, String lowPrisTidSlut, double avePrisOre){}
+
 //TODO getHighLow skriver ut för många gånger. Slå ut den printer metoder från gethighLow
 //TODO get a sorted list from the zone, date acending in price.
+    //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
     private static void sortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh));
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
+        highestLowPrice result = getPriceHighLow(elPrisLista);
+        highLowAvePrinter(result);
         pricePrinter(elPrisLista);
     }
     private static void unSortedList(){
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh));
-        getPriceHighLow(elPrisLista);
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
+        highestLowPrice result = getPriceHighLow(elPrisLista);
         elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::timeStart));
+        highLowAvePrinter(result);
         pricePrinter(elPrisLista);
     }
 
@@ -114,13 +120,13 @@ public class Main {
         return testPriser;
     }
 
-    private static void getPriceHighLow(List<ElpriserAPI.Elpris> elpriser) {
-        double highPris = elpriser.getLast().sekPerKWh();
-        String highPrisTidStart = elpriser.getLast().timeStart().toLocalTime().toString().substring(0, 2);
-        var highPrisTidSlut = elpriser.getLast().timeEnd().toLocalTime().toString().substring(0, 2);
-        var lowPris = elpriser.getFirst().sekPerKWh();
-        var lowPrisTidStart = elpriser.getFirst().timeStart().toLocalTime().toString().substring(0, 2);
-        var lowPrisTidSlut = elpriser.getFirst().timeEnd().toLocalTime().toString().substring(0, 2);
+    private static highestLowPrice getPriceHighLow(List<ElpriserAPI.Elpris> elpriser) {
+        double highPris = elpriser.getFirst().sekPerKWh();
+        String highPrisTidStart = elpriser.getFirst().timeStart().toLocalTime().toString().substring(0, 2);
+        var highPrisTidSlut = elpriser.getFirst().timeEnd().toLocalTime().toString().substring(0, 2);
+        var lowPris = elpriser.getLast().sekPerKWh();
+        var lowPrisTidStart = elpriser.getLast().timeStart().toLocalTime().toString().substring(0, 2);
+        var lowPrisTidSlut = elpriser.getLast().timeEnd().toLocalTime().toString().substring(0, 2);
         for (int i = 0; i < elpriser.size(); i++) {
             sumPrice += elpriser.get(i).sekPerKWh();
         }
@@ -130,14 +136,14 @@ public class Main {
         double highPrisOre = highPris * 100;
         double lowPrisOre = lowPris * 100;
         double avePrisOre = avePrice * 100;
-        highLowAvePrinter(highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
+        return new highestLowPrice (highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
     }
 
-    private static void highLowAvePrinter(double highPrisOre, String highPrisTidStart, String highPrisTidSlut, double lowPrisOre, String lowPrisTidStart, String lowPrisTidSlut, double avePrisOre) {
+    private static void highLowAvePrinter(highestLowPrice prices) {
         System.out.printf("""
-                Högsta pris:  %.4f öre/kWh  Tid: %s-%s
-                Lägsta pris:  %.4f öre/kWh  Tid: %s-%s
-                Medelpris:    %.4f öre/kWh \n""", highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
+                Högsta pris:  %.2f öre/kWh  Tid: %s-%s
+                Lägsta pris:  %.2f öre/kWh  Tid: %s-%s
+                Medelpris:    %.2f öre/kWh \n""", prices.highPrisOre, prices.highPrisTidStart, prices.highPrisTidSlut, prices.lowPrisOre, prices.lowPrisTidStart, prices.lowPrisTidSlut, prices.avePrisOre);
     }
 
     private static void pricePrinter(List<ElpriserAPI.Elpris> elpriser) {
@@ -157,8 +163,8 @@ public class Main {
         System.out.printf("""
                 -------HELP PAGE------------
                  To best use this program.
-                 input --zone is required SE1|SE2|SE3|SE4 to get the right area.
-                Next --date if you wish to see other than todays prices.
+                 input zone is required SE1|SE2|SE3|SE4 with the argument --zone to get the right area.
+                Next date if you wish to see other than todays prices. Use --date with YYYY-MM-DD
                 Tomorrows prices are provied after 13:00.
                 
                 If you wish to see the list sorted in acending price order,
