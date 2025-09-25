@@ -9,13 +9,12 @@ import java.util.*;
 
 
 public class Main {
-    public static final ElpriserAPI elAPI = new ElpriserAPI();
+    public static ElpriserAPI elAPI;
     public static String zone = null;
     public static String callDate = null;
     public static boolean validZone = false;
     public static boolean validDate = false;
     public static boolean callSorted = false;
-
     enum zoneChoise {SE1, SE2, SE3, SE4}
 
 
@@ -33,7 +32,7 @@ public class Main {
         }
         highestLowPrice result = getPriceHighLow(elPrisLista);
         highLowAvePrinter(result);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());//ta bort reversed för ascending
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh));//reversed för decending/ascending utan
         pricePrinter(elPrisLista);
     }
 
@@ -72,7 +71,13 @@ public class Main {
 
     public static void main(String[] args) {
         //APIn fattade inte LocalDate format, tvunget med parse toString.
-        String inputZone = null;
+        zone = null;
+        callDate = null;
+        validZone = false;
+        validDate = false;
+        callSorted = false;
+        elAPI = new ElpriserAPI();
+
 
         if (args.length == 0) {
             helpPrint();
@@ -96,21 +101,23 @@ public class Main {
             helpPrint();
         } else if (validDate && callSorted) {
             sortedList();
-        } else if (validDate != callSorted) {
+        } else if (validDate && !callSorted) {
             unSortedList();
-        } else if (callSorted) {
+        } else if (!validDate && callSorted) {
             callDate = LocalDate.now().toString();
             sortedList();
+        }else{
+            helpPrint();
         }
 
 
     }
 
     private static List getPriceList(String callDate, String zone) {
-        List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
+        List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, com.example.api.ElpriserAPI.Prisklass.valueOf(zone));
         if (testPriser.size() == 0) {
             System.out.println("Inga priser funna.");
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
         return testPriser;
     }
@@ -149,7 +156,7 @@ public class Main {
         System.out.println("Priser funna för dagen: " + elpriser.size() + "\n");
         elpriser.stream().forEach(pris ->
                 System.out.printf("""
-                                Tidstart: %s-%s Pris: %.2f Öre/kWh \n""",
+                                %s-%s %.2f öre\n""",
                         pris.timeStart().toLocalTime().toString().substring(0, 2), pris.timeEnd().toLocalTime().toString().substring(0, 2), pris.sekPerKWh() * 100)
         );
     }
