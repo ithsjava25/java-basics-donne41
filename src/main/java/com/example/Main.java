@@ -10,11 +10,11 @@ import java.util.*;
 
 public class Main {
     public static ElpriserAPI elAPI;
-    public static String zone = null;
-    public static String callDate = null;
-    public static boolean validZone = false;
-    public static boolean validDate = false;
-    public static boolean callSorted = false;
+    public static String zone;
+    public static String callDate;
+    public static boolean validZone;
+    public static boolean validDate;
+    public static boolean callSorted;
     enum zoneChoise {SE1, SE2, SE3, SE4}
 
 
@@ -22,9 +22,7 @@ public class Main {
                                   double lowPrisOre, String lowPrisTidStart, String lowPrisTidSlut, double avePrisOre) {
     }
 
-    //TODO getHighLow skriver ut för många gånger. Slå ut den printer metoder från gethighLow
-//TODO get a sorted list from the zone, date acending in price.
-    //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
+    //TODO Om ordningen fuckar, lägg till/ta bort .reversed()
     private static void sortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
         if (elPrisLista.size() == 0) {
@@ -68,22 +66,19 @@ public class Main {
         validZone = true;
     }
 
-
+    //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
     public static void main(String[] args) {
-        //APIn fattade inte LocalDate format, tvunget med parse toString.
+        elAPI = new ElpriserAPI();
         zone = null;
         callDate = null;
         validZone = false;
         validDate = false;
         callSorted = false;
-        elAPI = new ElpriserAPI();
-
 
         if (args.length == 0) {
             helpPrint();
             return;
         } else {
-
             for (int i = 0; i < args.length; i++) {
                 switch (args[i].toLowerCase()) {
                     case "--help" -> {
@@ -94,7 +89,6 @@ public class Main {
                     case "--zone" -> zoneInput(args[i + 1]);
                     case "--date" -> dateInput(args[i + 1]);
                 }
-
             }
         }
         if (!validZone) {
@@ -106,11 +100,12 @@ public class Main {
         } else if (!validDate && callSorted) {
             callDate = LocalDate.now().toString();
             sortedList();
+        } else if(!validDate && !callSorted) {
+            callDate = LocalDate.now().toString();
+            unSortedList();
         }else{
             helpPrint();
         }
-
-
     }
 
     private static List getPriceList(String callDate, String zone) {
@@ -166,12 +161,16 @@ public class Main {
         System.out.printf("""
                 -------HELP PAGE------------
                  To best usage of this program.
-                 input zone is required SE1|SE2|SE3|SE4 with the argument --zone to get the right area.
+                input zone is required SE1|SE2|SE3|SE4 with the argument --zone to get the right area.
                 Next date if you wish to see other than todays prices. Use --date with YYYY-MM-DD
                 Tomorrows prices are provied after 13:00.
                 
                 If you wish to see the list sorted in acending price order,
                 include --sorted in the arguments. Otherwise it will be sorted by the hour.
+                
+                Exampel of command
+                --zone se2 --date 2025-09-20 --sorted
+                --zone se4 --sorted
                 
                 To know the best time to charge you car you can
                 input --charging with time frame of 2, 4 or 6 hours
@@ -179,5 +178,3 @@ public class Main {
     }
 
 }
-
-
