@@ -32,6 +32,9 @@ public class Main {
     //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
     private static void sortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
+        if(elPrisLista.size() == 0){
+            return;
+        }
         highestLowPrice result = getPriceHighLow(elPrisLista);
         highLowAvePrinter(result);
         elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
@@ -40,6 +43,9 @@ public class Main {
 
     private static void unSortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
+        if(elPrisLista.size() == 0){
+            return;
+        }
         highestLowPrice result = getPriceHighLow(elPrisLista);
         highLowAvePrinter(result);
         pricePrinter(elPrisLista);
@@ -70,7 +76,6 @@ public class Main {
 
     public static void main(String[] args) {
         //APIn fattade inte LocalDate format, tvunget med parse toString.
-        enum zone {SE1, SE2, SE3, SE4}
         String inputZone = null;
 
         if (args.length == 0) {
@@ -98,6 +103,7 @@ public class Main {
         } else if (validDate != callSorted) {
             unSortedList();
         } else if (callSorted) {
+            callDate = LocalDate.now().toString();
             sortedList();
         }
 
@@ -106,10 +112,9 @@ public class Main {
 
     private static List getPriceList(String callDate, String zone) {
         List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
-        if (testPriser.isEmpty()) {
-            callDate = LocalDate.now().toString();
-            testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
-
+        if (testPriser.size() == 0) {
+            System.out.println("Inga priser funna.");
+            return Collections.EMPTY_LIST;
         }
         return testPriser;
     }
