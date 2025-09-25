@@ -17,26 +17,31 @@ public class Main {
     public static boolean validDate = false;
     public static boolean validArg = false;
     public static boolean callSorted = false;
-    enum zoneChoise { SE1,SE2,SE3,SE4}
+
+    enum zoneChoise {SE1, SE2, SE3, SE4}
+
     static double avePrice = 0;
     static double sumPrice = 0;
 
-    public record highestLowPrice ( double highPrisOre, String highPrisTidStart, String highPrisTidSlut, double lowPrisOre, String lowPrisTidStart, String lowPrisTidSlut, double avePrisOre){}
+    public record highestLowPrice(double highPrisOre, String highPrisTidStart, String highPrisTidSlut,
+                                  double lowPrisOre, String lowPrisTidStart, String lowPrisTidSlut, double avePrisOre) {
+    }
 
-//TODO getHighLow skriver ut för många gånger. Slå ut den printer metoder från gethighLow
+    //TODO getHighLow skriver ut för många gånger. Slå ut den printer metoder från gethighLow
 //TODO get a sorted list from the zone, date acending in price.
     //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
     private static void sortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
         highestLowPrice result = getPriceHighLow(elPrisLista);
         highLowAvePrinter(result);
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
         pricePrinter(elPrisLista);
     }
-    private static void unSortedList(){
+
+    private static void unSortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
         highestLowPrice result = getPriceHighLow(elPrisLista);
         highLowAvePrinter(result);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::timeStart));
         pricePrinter(elPrisLista);
     }
 
@@ -55,7 +60,7 @@ public class Main {
         arg = arg.toUpperCase();
         try {
             zone = zoneChoise.valueOf(arg).toString();
-        }catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             System.out.println("Invalid zone, Must choose between SE1,SE2,SE3,SE4. Type --help for more information.");
             return;
         }
@@ -64,16 +69,11 @@ public class Main {
 
 
     public static void main(String[] args) {
-        //TODO Fixa en for each, en som gör en boolean om det finns --argument,
-        //TODO Och en sträng som samtidigt kollar input värdet, tex datumet, elzonen.
-        //TODO --sorting ska ta datum och presentera dagen alla priser i fallade ordning.
         //APIn fattade inte LocalDate format, tvunget med parse toString.
         enum zone {SE1, SE2, SE3, SE4}
         String inputZone = null;
 
         if (args.length == 0) {
-            System.out.println("Start argument är tom, startar manuell inmatning." +
-                    "usage is with a zone and optional date to see sorted list of highest,lowset and average price.");
             helpPrint();
             return;
         } else {
@@ -91,31 +91,26 @@ public class Main {
 
             }
         }
-        if (validZone && validDate && callSorted) {
-            sortedList();
-            return;
-
-        }else if(validZone && callSorted) {
-            sortedList();
-        } else if (validZone && validDate != callSorted) {
-            unSortedList();
-        }else{
+        if (!validZone) {
             helpPrint();
-            return;
+        } else if(validDate && callSorted) {
+            sortedList();
+        } else if (validDate != callSorted) {
+            unSortedList();
+        } else if (callSorted) {
+            sortedList();
         }
 
 
     }
 
-    //todo två metoder, en som är sorted för hela dagen, stigade. en som presenterar högsta lägsta.
-    //todo borde kunna återanvända en av metoderna.
     private static List getPriceList(String callDate, String zone) {
         List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
         if (testPriser.isEmpty()) {
             callDate = LocalDate.now().toString();
             testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
 
-       }
+        }
         return testPriser;
     }
 
@@ -137,7 +132,7 @@ public class Main {
         double highPrisOre = highPris * 100;
         double lowPrisOre = lowPris * 100;
         double avePrisOre = avePrice * 100;
-        return new highestLowPrice (highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
+        return new highestLowPrice(highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
     }
 
     private static void highLowAvePrinter(highestLowPrice prices) {
@@ -152,18 +147,16 @@ public class Main {
         getPriceHighLow(elpriser);
         elpriser.stream().forEach(pris ->
                 System.out.printf("""
-                                Pris: %.4f SEK/kWh Tidstart: %s   Tidslut: %s \n""",
-                        pris.sekPerKWh(), pris.timeStart().toLocalTime(), pris.timeEnd().toLocalTime())
+                                Tidstart: %s-%s Pris: %.2f Öre/kWh \n""",
+                        pris.timeStart().toLocalTime().toString().substring(0, 2), pris.timeEnd().toLocalTime().toString().substring(0, 2), pris.sekPerKWh() * 100)
         );
     }
-
-
 
 
     public static void helpPrint() {
         System.out.printf("""
                 -------HELP PAGE------------
-                 To best use this program.
+                 To best usage of this program.
                  input zone is required SE1|SE2|SE3|SE4 with the argument --zone to get the right area.
                 Next date if you wish to see other than todays prices. Use --date with YYYY-MM-DD
                 Tomorrows prices are provied after 13:00.
