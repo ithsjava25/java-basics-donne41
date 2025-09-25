@@ -37,7 +37,7 @@ public class Main {
         }
         highestLowPrice result = getPriceHighLow(elPrisLista);
         highLowAvePrinter(result);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());//ta bort reversed för ascending
         pricePrinter(elPrisLista);
     }
 
@@ -149,7 +149,6 @@ public class Main {
 
     private static void pricePrinter(List<ElpriserAPI.Elpris> elpriser) {
         System.out.println("Priser funna för dagen: " + elpriser.size() + "\n");
-        getPriceHighLow(elpriser);
         elpriser.stream().forEach(pris ->
                 System.out.printf("""
                                 Tidstart: %s-%s Pris: %.2f Öre/kWh \n""",
