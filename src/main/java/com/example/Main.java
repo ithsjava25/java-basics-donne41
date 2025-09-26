@@ -3,19 +3,26 @@ package com.example;
 import com.example.api.ElpriserAPI;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 
 
 public class Main {
-    public static ElpriserAPI elAPI;
-    public static String zone;
-    public static String callDate;
-    public static boolean validZone;
-    public static boolean validDate;
-    public static boolean callSorted;
-    static DateTimeFormatter hourFormatter = DateTimeFormatter.ofPattern("HH");
+    private static ElpriserAPI elAPI;
+    private static String zone;
+    private static String callDate;
+    private static boolean validZone;
+    private static boolean validDate;
+    private static boolean callSorted;
+    static String today;
+    static LocalTime todayTime;
+    static LocalTime nextDayPublish = LocalTime.of(13,0);
+    static DateTimeFormatter onlyHourFormatter = DateTimeFormatter.ofPattern("HH");
+    static DateTimeFormatter digitalFormatter = DateTimeFormatter.ofPattern("HH:mm");
+    static DateTimeFormatter todayFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
     enum zoneChoise {SE1, SE2, SE3, SE4}
 
 
@@ -68,6 +75,10 @@ public class Main {
     }
 
     //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
+    //TODO Charching. anväder dagens datum. kan sträcka sig till morgondagen om det finns priser
+    //todo metod som tar två dagars lista, (om det finns) med parameter för 2 4 eller 8 timmars laddning
+    //todo parametern får vara hur många timmar som adderas ihop från början.
+    //argument hantering, ska bara behöva zone och charging,  ignorera resten om den hittas.
     public static void main(String[] args) {
         elAPI = new ElpriserAPI();
         zone = null;
@@ -75,6 +86,10 @@ public class Main {
         validZone = false;
         validDate = false;
         callSorted = false;
+        today = LocalDate.now().toString();
+        todayTime = LocalTime.now();
+
+        charingWindow("SE4");
 
 
         if (args.length == 0) {
@@ -92,7 +107,7 @@ public class Main {
                     case "--zone" -> zoneInput(args[i + 1]);
                     case "--date" -> dateInput(args[i + 1]);
                 }}catch(ArrayIndexOutOfBoundsException e){
-                    System.out.println("Found --date argument but no date.");
+                    System.out.println("Found argument but no parameters.");
                 }
             }
         }
@@ -103,14 +118,61 @@ public class Main {
         } else if (validDate && !callSorted) {
             unSortedList();
         } else if (!validDate && callSorted) {
-            callDate = LocalDate.now().toString();
+            callDate = today;
             sortedList();
         } else if(!validDate && !callSorted) {
-            callDate = LocalDate.now().toString();
+            callDate = today;
             unSortedList();
         }else{
             helpPrint();
         }
+    }
+
+    private static void charingWindow(String zone){
+        //todo fixa om klockan är efter 13 så testa få priser för morgondagen.
+        //TODO fixa om det inte kommer för idag men bara imorgon måste det framgå.
+        String tomorrow= null;
+        List<ElpriserAPI.Elpris> priceList = new ArrayList();
+        List<ElpriserAPI.Elpris> todayList = getPriceList(today, zone);
+        priceList.addAll(todayList);
+        if(todayTime.isAfter(nextDayPublish)){
+            tomorrow = LocalDate.now().plusDays(1).toString();
+            List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
+            priceList.addAll(tomorrowList);
+        }
+
+        int window = 4;
+        int length = priceList.size();
+        int beguinHour = 0;
+        int stopHour = 0;
+        String startHour;
+        String endHour;
+        double windowSum = 0;
+        double minSum = 0;
+        double aveSum =0;
+        //gör en enum för window, så jag får med int värdet typ.
+        //eller kan jag jämföra bara 2h -> 2 osv. mycket felkällor väl?
+        for (int i = 0; i < window; i++){
+            windowSum += priceList.get(i).sekPerKWh();
+        }
+        stopHour = window-1;
+        minSum = windowSum;
+        //sliding window närmar sig
+        for(int i = window; i < length; i++){
+            windowSum += priceList.get(i).sekPerKWh() - priceList.get(i - window).sekPerKWh();
+            if(windowSum < minSum){
+                minSum = windowSum;
+                beguinHour = i-1;
+                stopHour = beguinHour+window-1;
+            }
+        }
+        //TODO skicka till utskrift metod. Fixa formatering, double utskrift atm.
+        aveSum = (minSum / window)*100;
+        startHour = priceList.get(beguinHour).timeStart().format(digitalFormatter);
+        endHour = priceList.get(stopHour).timeEnd().format(digitalFormatter);
+        //spara timmarna..? index värdet kanske.
+        System.out.println("Start charging: "+startHour + " stop at "+ endHour+ " Snittpris under den tiden " + aveSum +" öre");
+
     }
 
     private static List getPriceList(String callDate, String zone) {
@@ -128,11 +190,11 @@ public class Main {
         double avePrice;
         double sumPrice = 0;
         double highPris = copy.getFirst().sekPerKWh();
-        String highPrisTidStart = copy.getFirst().timeStart().format(hourFormatter);
-        var highPrisTidSlut = copy.getFirst().timeEnd().format(hourFormatter);
+        String highPrisTidStart = copy.getFirst().timeStart().format(onlyHourFormatter);
+        var highPrisTidSlut = copy.getFirst().timeEnd().format(onlyHourFormatter);
         var lowPris = copy.getLast().sekPerKWh();
-        var lowPrisTidStart = copy.getLast().timeStart().format(hourFormatter);
-        var lowPrisTidSlut = copy.getLast().timeEnd().format(hourFormatter);
+        var lowPrisTidStart = copy.getLast().timeStart().format(onlyHourFormatter);
+        var lowPrisTidSlut = copy.getLast().timeEnd().format(onlyHourFormatter);
         for (int i = 0; i < copy.size(); i++) {
             sumPrice += copy.get(i).sekPerKWh();
         }
@@ -157,7 +219,7 @@ public class Main {
         elpriser.stream().forEach(pris ->
                 System.out.printf("""
                                 %s-%s %.2f öre\n""",
-                        pris.timeStart().format(hourFormatter), pris.timeEnd().format(hourFormatter), pris.sekPerKWh() * 100)
+                        pris.timeStart().format(onlyHourFormatter), pris.timeEnd().format(onlyHourFormatter), pris.sekPerKWh() * 100)
         );
     }
 
