@@ -17,13 +17,18 @@ public class Main {
     private static boolean validZone;
     private static boolean validDate;
     private static boolean callSorted;
+    private static boolean validWindow;
     static String today;
     static LocalTime todayTime;
-    static LocalTime nextDayPublish = LocalTime.of(13,0);
+    static LocalTime nextDayPublish = LocalTime.of(13, 0);
     static DateTimeFormatter onlyHourFormatter = DateTimeFormatter.ofPattern("HH");
     static DateTimeFormatter digitalFormatter = DateTimeFormatter.ofPattern("HH:mm");
     static DateTimeFormatter todayFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+
     enum zoneChoise {SE1, SE2, SE3, SE4}
+
+    static String[] windowChoice = {"2h", "4h", "8h"};
+    static int window;
 
 
     public record highestLowPrice(double highPrisOre, String highPrisTidStart, String highPrisTidSlut,
@@ -58,7 +63,7 @@ public class Main {
             callDate = LocalDate.parse(callDate, DateTimeFormatter.ISO_LOCAL_DATE).toString();
         } catch (DateTimeParseException e) {
             System.out.println("Invalid date, using todays date instead");
-            callDate = LocalDate.now().toString();
+            callDate = today;
         }
         validDate = true;
     }
@@ -67,11 +72,11 @@ public class Main {
         arg = arg.toUpperCase();
         try {
             zone = zoneChoise.valueOf(arg).toString();
+            validZone = true;
         } catch (IllegalArgumentException e) {
             System.out.println("Invalid zone, Must choose between SE1,SE2,SE3,SE4. Type --help for more information.");
             return;
         }
-        validZone = true;
     }
 
     //TODO Sliding window, då sparas ba 2 värden, och när vi flyttar ett steg frammåt så tas den bort som lämnades.
@@ -86,10 +91,10 @@ public class Main {
         validZone = false;
         validDate = false;
         callSorted = false;
+        validWindow = false;
         today = LocalDate.now().toString();
         todayTime = LocalTime.now();
-
-        charingWindow("SE4");
+        window = 0;
 
 
         if (args.length == 0) {
@@ -97,22 +102,27 @@ public class Main {
             return;
         } else {
             for (int i = 0; i < args.length; i++) {
-                try{
-                switch (args[i].toLowerCase()) {
-                    case "--help" -> {
-                        helpPrint();
-                        return;
+                try {
+                    switch (args[i].toLowerCase()) {
+                        case "--help" -> {
+                            helpPrint();
+                            return;
+                        }
+                        case "--sorted" -> callSorted = true;
+                        case "--zone" -> zoneInput(args[i + 1]);
+                        case "--charging" -> charginInput(args[i + 1]);
+                        case "--date" -> dateInput(args[i + 1]);
                     }
-                    case "--sorted" -> callSorted = true;
-                    case "--zone" -> zoneInput(args[i + 1]);
-                    case "--date" -> dateInput(args[i + 1]);
-                }}catch(ArrayIndexOutOfBoundsException e){
+                } catch (ArrayIndexOutOfBoundsException e) {
                     System.out.println("Found argument but no parameters.");
-                }
+                    helpPrint();
+                }//TODO få den att inte gå utanför arraym ed args i+1
             }
         }
         if (!validZone) {
             helpPrint();
+        } else if (validWindow && validDate) {
+            charingWindow();
         } else if (validDate && callSorted) {
             sortedList();
         } else if (validDate && !callSorted) {
@@ -120,28 +130,53 @@ public class Main {
         } else if (!validDate && callSorted) {
             callDate = today;
             sortedList();
-        } else if(!validDate && !callSorted) {
+        } else if (!validDate && !callSorted) {
             callDate = today;
             unSortedList();
-        }else{
+        } else {
             helpPrint();
+        }//todo flytta ner charging
+    }
+
+    private static void charginInput(String arg) {
+        switch (arg) {
+            case "8h" -> {
+                window = 8;
+                validWindow = true;
+            }
+            case "4h" -> {
+                window = 4;
+                validWindow = true;
+            }
+            case "2h" -> {
+                window = 2;
+                validWindow = true;
+            }
+            default -> {
+                window = 2;
+                validWindow = true;
+                System.out.println("Invalid window input, must be 2h|4h|8h. Using default window of 2h");
+            }
         }
     }
 
-    private static void charingWindow(String zone){
-        //todo fixa om klockan är efter 13 så testa få priser för morgondagen.
-        //TODO fixa om det inte kommer för idag men bara imorgon måste det framgå.
-        String tomorrow= null;
+    private static void charingWindow() {
+        String tomorrow = null;
         List<ElpriserAPI.Elpris> priceList = new ArrayList();
-        List<ElpriserAPI.Elpris> todayList = getPriceList(today, zone);
+        List<ElpriserAPI.Elpris> todayList = getPriceList(callDate, zone);
         priceList.addAll(todayList);
-        if(todayTime.isAfter(nextDayPublish)){
-            tomorrow = LocalDate.now().plusDays(1).toString();
+        if (todayTime.isAfter(nextDayPublish) | LocalDate.parse(callDate).isBefore(LocalDate.parse(today))) {
+            tomorrow = LocalDate.parse(callDate).plusDays(1).toString();
             List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
-            priceList.addAll(tomorrowList);
+            if (tomorrowList.size() < window) {
+                priceList.addAll(tomorrowList);
+            } else {
+                for (int i = 0; i < window; i++) {
+                    priceList.add(tomorrowList.get(i));
+                }
+            }
         }
 
-        int window = 4;
         int length = priceList.size();
         int beguinHour = 0;
         int stopHour = 0;
@@ -149,30 +184,32 @@ public class Main {
         String endHour;
         double windowSum = 0;
         double minSum = 0;
-        double aveSum =0;
-        //gör en enum för window, så jag får med int värdet typ.
-        //eller kan jag jämföra bara 2h -> 2 osv. mycket felkällor väl?
-        for (int i = 0; i < window; i++){
+        double aveSum = 0;
+        //sliding window
+        for (int i = 0; i < window; i++) {
             windowSum += priceList.get(i).sekPerKWh();
         }
-        stopHour = window-1;
+        stopHour = window - 1;
         minSum = windowSum;
-        //sliding window närmar sig
-        for(int i = window; i < length; i++){
+        for (int i = window; i < length; i++) {
             windowSum += priceList.get(i).sekPerKWh() - priceList.get(i - window).sekPerKWh();
-            if(windowSum < minSum){
+            if (windowSum < minSum) {
                 minSum = windowSum;
-                beguinHour = i-1;
-                stopHour = beguinHour+window-1;
+                beguinHour = i - window + 1;
+                stopHour = i;
             }
         }
         //TODO skicka till utskrift metod. Fixa formatering, double utskrift atm.
-        aveSum = (minSum / window)*100;
+        aveSum = (minSum / window) * 100;
         startHour = priceList.get(beguinHour).timeStart().format(digitalFormatter);
         endHour = priceList.get(stopHour).timeEnd().format(digitalFormatter);
-        //spara timmarna..? index värdet kanske.
-        System.out.println("Start charging: "+startHour + " stop at "+ endHour+ " Snittpris under den tiden " + aveSum +" öre");
+        windowPrinter(startHour, endHour, aveSum);
+    }
 
+    private static void windowPrinter(String startHour, String endHour, double aveSum) {
+        System.out.printf("""
+                Påbörja laddning kl %s - %s 
+                Medelpris för fönster: %.2f öre""", startHour, endHour, aveSum);
     }
 
     private static List getPriceList(String callDate, String zone) {
@@ -198,8 +235,6 @@ public class Main {
         for (int i = 0; i < copy.size(); i++) {
             sumPrice += copy.get(i).sekPerKWh();
         }
-        //fixa tiden så att start och slut tiden är tex 01-02 istället för 01:00-02:00
-        //skriv ut i öre istället för kr.
         avePrice = sumPrice / copy.size();
         double highPrisOre = highPris * 100;
         double lowPrisOre = lowPris * 100;
@@ -235,12 +270,15 @@ public class Main {
                 If you wish to see the list sorted in acending price order,
                 include --sorted in the arguments. Otherwise it will be sorted by the hour.
                 
+                To know the best time to charge you car you can
+                input --charging with 2h|4h|8h representing time frame of 2, 4 or 6 hours
+                
                 Exampel of command
                 --zone se2 --date 2025-09-20 --sorted
                 --zone se4 --sorted
+                --zone se3 --charging 4h
                 
-                To know the best time to charge you car you can
-                input --charging with time frame of 2, 4 or 6 hours
+                
                 -----------------------------""");
     }
 
