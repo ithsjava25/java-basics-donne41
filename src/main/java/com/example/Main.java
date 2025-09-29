@@ -21,54 +21,15 @@ public class Main {
     static LocalTime nextDayPublish = LocalTime.of(13, 0);
     static DateTimeFormatter onlyHourFormatter = DateTimeFormatter.ofPattern("HH");
     static DateTimeFormatter digitalFormatter = DateTimeFormatter.ofPattern("HH:mm");
+    static DateTimeFormatter dayDate = DateTimeFormatter.ofPattern("dd");
 
     enum zoneChoise {SE1, SE2, SE3, SE4}
 
     static int window;
 
 
-    //TODO Om ordningen fuckar, lägg till/ta bort .reversed() på rad 42, elPrisLista.sort
-    private static void sortedList() {
-        List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        if (elPrisLista.size() == 0) {
-            return;
-        }
-        priceStatistics result = getPriceStatistics(elPrisLista);
-        highLowAvePrinter(result);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh));//reversed för decending/ascending utan
-        pricePrinter(elPrisLista);
-    }
 
-    private static void unSortedList() {
-        List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        if (elPrisLista.size() == 0) {
-            return;
-        }
-        priceStatistics result = getPriceStatistics(elPrisLista);
-        highLowAvePrinter(result);
-        pricePrinter(elPrisLista);
-    }
 
-    private static void dateInput(String arg) {
-        callDate = arg;
-        try {
-            callDate = LocalDate.parse(callDate, DateTimeFormatter.ISO_LOCAL_DATE).toString();
-        } catch (DateTimeParseException e) {
-            System.out.println("Invalid date, using todays date instead");
-            callDate = today;
-        }
-        validDate = true;
-    }
-
-    private static void zoneInput(String arg) {
-        arg = arg.toUpperCase();
-        try {
-            zone = zoneChoise.valueOf(arg).toString();
-            validZone = true;
-        } catch (IllegalArgumentException e) {
-            System.out.println("Invalid zone, Must choose between SE1,SE2,SE3,SE4. Type --help for more information.");
-        }
-    }
 
     public static void main(String[] args) {
         Locale.setDefault(Locale.of("sv","se"));
@@ -169,6 +130,48 @@ public class Main {
             }
         }
     }
+    //TODO Om ordningen fuckar, lägg till/ta bort .reversed() på rad 141, elPrisLista.sort
+    private static void sortedList() {
+        List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
+        if (elPrisLista.size() == 0) {
+            return;
+        }
+        priceStatistics result = getPriceStatistics(elPrisLista);
+        highLowAvePrinter(result);
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh));//reversed för decending/ascending utan
+        pricePrinter(elPrisLista);
+    }
+
+    private static void unSortedList() {
+        List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
+        if (elPrisLista.size() == 0) {
+            return;
+        }
+        priceStatistics result = getPriceStatistics(elPrisLista);
+        highLowAvePrinter(result);
+        pricePrinter(elPrisLista);
+    }
+
+    private static void dateInput(String arg) {
+        callDate = arg;
+        try {
+            callDate = LocalDate.parse(callDate, DateTimeFormatter.ISO_LOCAL_DATE).toString();
+        } catch (DateTimeParseException e) {
+            System.out.println("Invalid date, using todays date instead");
+            callDate = today;
+        }
+        validDate = true;
+    }
+
+    private static void zoneInput(String arg) {
+        arg = arg.toUpperCase();
+        try {
+            zone = zoneChoise.valueOf(arg).toString();
+            validZone = true;
+        } catch (IllegalArgumentException e) {
+            System.out.println("Invalid zone, Must choose between SE1,SE2,SE3,SE4. Type --help for more information.");
+        }
+    }
 
     private static List<ElpriserAPI.Elpris> getPricesForMoreDays() {
         String tomorrow = "";
@@ -179,13 +182,6 @@ public class Main {
             if (todayTime.isAfter(nextDayPublish)) {
                 tomorrow = LocalDate.parse(today).plusDays(1).toString();
                 List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
-                if (tomorrowList.size() < window) {
-                    totalList.addAll(tomorrowList);
-                } else {
-                    for (int i = 0; i < window; i++) {
-                        totalList.add(tomorrowList.get(i));
-                    }
-                }
             }
             return totalList;
         } else {
@@ -193,14 +189,7 @@ public class Main {
             totalList.addAll(callList);
             tomorrow = LocalDate.parse(callDate).plusDays(1).toString();
             List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
-            if (tomorrowList.size() < window) {
-                totalList.addAll(tomorrowList);
-            } else {
-                for (int i = 0; i < window; i++) {
-                    totalList.add(tomorrowList.get(i));
-                }
-            }
-
+            totalList.addAll(callList);
             return totalList;
         }
     }
@@ -208,8 +197,9 @@ public class Main {
     private static void charingWindow() {
         List<ElpriserAPI.Elpris> priceList = getPricesForMoreDays();
         int length = priceList.size();
-        int beguinHour = 0;
+        int beguinHour =1;
         int stopHour;
+        String startDate;
         String startHour;
         String endHour;
         double windowSum = 0;
@@ -230,15 +220,10 @@ public class Main {
             }
         }
         aveSum = (minSum / window) * 100;
+        startDate = priceList.get(beguinHour).timeStart().format(dayDate);
         startHour = priceList.get(beguinHour).timeStart().format(digitalFormatter);
         endHour = priceList.get(stopHour).timeEnd().format(digitalFormatter);
-        windowPrinter(startHour, endHour, aveSum);
-    }
-
-    private static void windowPrinter(String startHour, String endHour, double aveSum) {
-        System.out.printf("""
-                Påbörja laddning kl %s - %s 
-                Medelpris för fönster: %.2f öre\n""", startHour, endHour, aveSum);
+        windowPrinter(startDate,startHour, endHour, aveSum);
     }
 
     private static List<ElpriserAPI.Elpris>getPriceList(String callDate, String zone) {
@@ -271,6 +256,12 @@ public class Main {
         return new priceStatistics(highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
     }
 
+    private static void windowPrinter(String startDate, String startHour, String endHour, double aveSum) {
+        System.out.printf("""
+                Påbörja laddning den %se kl %s - %s 
+                Medelpris för fönster: %.2f öre\n""", startDate, startHour, endHour, aveSum);
+    }
+
     private static void highLowAvePrinter(priceStatistics prices) {
         System.out.printf("""
                 Högsta pris:  %.2f öre/kWh  Tid: %s-%s
@@ -285,7 +276,7 @@ public class Main {
                                 %s-%s %.2f öre\n""",
                         pris.timeStart().format(onlyHourFormatter), pris.timeEnd().format(onlyHourFormatter), pris.sekPerKWh() * 100)
         );
-    }
+    }//TODO testet gillar inte att det står något framför timeStart.
 
 
     public static void helpPrint() {
