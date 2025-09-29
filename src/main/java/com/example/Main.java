@@ -21,9 +21,10 @@ public class Main {
     static LocalTime nextDayPublish = LocalTime.of(13, 0);
     static DateTimeFormatter onlyHourFormatter = DateTimeFormatter.ofPattern("HH");
     static DateTimeFormatter digitalFormatter = DateTimeFormatter.ofPattern("HH:mm");
-    enum zoneChoise {SE1, SE2, SE3, SE4}
-    static int window;
 
+    enum zoneChoise {SE1, SE2, SE3, SE4}
+
+    static int window;
 
 
     //TODO Om ordningen fuckar, lägg till/ta bort .reversed() på rad 42, elPrisLista.sort
@@ -95,9 +96,32 @@ public class Main {
                             return;
                         }
                         case "--sorted" -> callSorted = true;
-                        case "--zone" -> zoneInput(args[i + 1]);
-                        case "--charging" -> charginInput(args[i + 1]);
-                        case "--date" -> dateInput(args[i + 1]);
+                        case "--zone" -> {
+                            if (args.length > i + 1) {
+                                zoneInput(args[i + 1]);
+                                i++;
+                            } else {
+                                System.out.println("Missing zone argument");
+                            }
+                        }
+                        case "--charging" -> {
+                            if (args.length > i + 1) {
+                                charginInput(args[i + 1]);
+                                i++;
+                            } else {
+                                System.out.println("Missing charging window, using default");
+                                charginInput("default value");
+                            }
+                        }
+                        case "--date" -> {
+                            if (args.length > i + 1) {
+                                dateInput(args[i + 1]);
+                                i++;
+                            } else {
+                                System.out.println("Missing date argument");
+                                dateInput("faltyDate");
+                            }
+                        }
                     }
                 } catch (ArrayIndexOutOfBoundsException e) {
                     System.out.println("Found argument but no parameters.");
@@ -141,17 +165,18 @@ public class Main {
             default -> {
                 window = 2;
                 validWindow = true;
-                System.out.println("Invalid window input, must be 2h|4h|8h. Using default window of 2h");
+                System.out.println("Invalid window input, must be 2h|4h|8h. Using default of 2h");
             }
         }
     }
-    private static List getPricesForMoreDays(){
+
+    private static List<ElpriserAPI.Elpris> getPricesForMoreDays() {
         String tomorrow = "";
-        List<ElpriserAPI.Elpris> totalList = new ArrayList();
-        if(!validDate){
+        List<ElpriserAPI.Elpris> totalList = new ArrayList<>();
+        if (!validDate) {
             List<ElpriserAPI.Elpris> todayList = getPriceList(today, zone);
             totalList.addAll(todayList);
-            if (todayTime.isAfter(nextDayPublish)){
+            if (todayTime.isAfter(nextDayPublish)) {
                 tomorrow = LocalDate.parse(today).plusDays(1).toString();
                 List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
                 if (tomorrowList.size() < window) {
@@ -163,26 +188,25 @@ public class Main {
                 }
             }
             return totalList;
-        }else{
+        } else {
             List<ElpriserAPI.Elpris> callList = getPriceList(callDate, zone);
             totalList.addAll(callList);
-            if (todayTime.isAfter(nextDayPublish)) {
-                tomorrow = LocalDate.parse(callDate).plusDays(1).toString();
-                List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
-                if (tomorrowList.size() < window) {
-                    totalList.addAll(tomorrowList);
-                } else {
-                    for (int i = 0; i < window; i++) {
-                        totalList.add(tomorrowList.get(i));
-                    }
+            tomorrow = LocalDate.parse(callDate).plusDays(1).toString();
+            List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
+            if (tomorrowList.size() < window) {
+                totalList.addAll(tomorrowList);
+            } else {
+                for (int i = 0; i < window; i++) {
+                    totalList.add(tomorrowList.get(i));
                 }
             }
+
             return totalList;
         }
     }
 
     private static void charingWindow() {
-        List<ElpriserAPI.Elpris>priceList = getPricesForMoreDays();
+        List<ElpriserAPI.Elpris> priceList = getPricesForMoreDays();
         int length = priceList.size();
         int beguinHour = 0;
         int stopHour;
@@ -217,7 +241,7 @@ public class Main {
                 Medelpris för fönster: %.2f öre\n""", startHour, endHour, aveSum);
     }
 
-    private static List getPriceList(String callDate, String zone) {
+    private static List<ElpriserAPI.Elpris>getPriceList(String callDate, String zone) {
         List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, com.example.api.ElpriserAPI.Prisklass.valueOf(zone));
         if (testPriser.size() == 0) {
             System.out.println("No data found online.");
