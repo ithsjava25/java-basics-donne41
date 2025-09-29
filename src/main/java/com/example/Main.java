@@ -67,11 +67,11 @@ public class Main {
             validZone = true;
         } catch (IllegalArgumentException e) {
             System.out.println("Invalid zone, Must choose between SE1,SE2,SE3,SE4. Type --help for more information.");
-            return;
         }
     }
 
     public static void main(String[] args) {
+        Locale.setDefault(Locale.of("sv","se"));
         elAPI = new ElpriserAPI();
         zone = null;
         callDate = null;
