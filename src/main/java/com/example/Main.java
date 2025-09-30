@@ -3,7 +3,9 @@ package com.example;
 import com.example.api.ElpriserAPI;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -16,6 +18,7 @@ public class Main {
     private static boolean validZone;
     private static boolean validDate;
     private static boolean validWindow;
+    private static boolean callSorted;
     static String today;
     static LocalTime todayTime;
     static LocalTime nextDayPublish = LocalTime.of(13, 0);
@@ -38,7 +41,7 @@ public class Main {
         callDate = null;
         validZone = false;
         validDate = false;
-        boolean callSorted = false;
+        callSorted = false;
         validWindow = false;
         today = LocalDate.now().toString();
         todayTime = LocalTime.now();
@@ -132,19 +135,22 @@ public class Main {
     }
     //TODO Om ordningen fuckar, lägg till/ta bort .reversed() på rad 141, elPrisLista.sort
     private static void sortedList() {
-        List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        if (elPrisLista.size() == 0) {
-            return;
+        List<ElpriserAPI.Elpris> elPrisLista = getPricesForMoreDays();
+        if(elPrisLista.size()==0){
+            System.out.println("Inga priser funna");
         }
         priceStatistics result = getPriceStatistics(elPrisLista);
         highLowAvePrinter(result);
-        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh));//reversed för decending/ascending utan
+        elPrisLista.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed().thenComparing(ElpriserAPI.Elpris::timeStart));//reversed för decending/ascending utan
         pricePrinter(elPrisLista);
+
     }
 
+
     private static void unSortedList() {
-        List<ElpriserAPI.Elpris> elPrisLista = getPriceList(callDate, zone);
-        if (elPrisLista.size() == 0) {
+        List<ElpriserAPI.Elpris> elPrisLista = getPricesForMoreDays();
+        if(elPrisLista.size()==0){
+            System.out.println("Inga priser funna");
             return;
         }
         priceStatistics result = getPriceStatistics(elPrisLista);
@@ -179,9 +185,14 @@ public class Main {
         if (!validDate) {
             List<ElpriserAPI.Elpris> todayList = getPriceList(today, zone);
             totalList.addAll(todayList);
-            if (todayTime.isAfter(nextDayPublish)) {
+            if(callSorted) {
                 tomorrow = LocalDate.parse(today).plusDays(1).toString();
                 List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
+                totalList.addAll(tomorrowList);
+            }
+            if(totalList.size()==0){
+                System.out.println("Ingen data tilgänglig");
+                return Collections.emptyList();
             }
             return totalList;
         } else {
@@ -189,7 +200,11 @@ public class Main {
             totalList.addAll(callList);
             tomorrow = LocalDate.parse(callDate).plusDays(1).toString();
             List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
-            totalList.addAll(callList);
+            totalList.addAll(tomorrowList);
+            if(totalList.size()==0){
+                System.out.println("Ingen data tilgänglig");
+                return Collections.emptyList();
+            }
             return totalList;
         }
     }
@@ -237,21 +252,60 @@ public class Main {
 
     private static priceStatistics getPriceStatistics(List<ElpriserAPI.Elpris> elpriser) {
         List<ElpriserAPI.Elpris> copy = new ArrayList<>(elpriser);
-        copy.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
+        //copy.sort(Comparator.comparing(ElpriserAPI.Elpris::sekPerKWh).reversed());
+        List<hourPriceAverage> hourAverageList = new ArrayList<>();
         double avePrice;
         double sumPrice = 0;
+        double hourSum;
+        double hourAverage;
         double highPris = copy.getFirst().sekPerKWh();
-        String highPrisTidStart = copy.getFirst().timeStart().format(onlyHourFormatter);
-        String highPrisTidSlut = copy.getFirst().timeEnd().format(onlyHourFormatter);
+        hourPriceAverage maxValue = null;
+        hourPriceAverage minValue = null;
+        String lowPrisTidStart = "";
+        String lowPrisTidSlut = "";
+        String highPrisTidStart = "";
+        String highPrisTidSlut = "";
+        //String highPrisTidStart = copy.getFirst().timeStart().format(onlyHourFormatter);
+        //String highPrisTidSlut = copy.getFirst().timeEnd().format(onlyHourFormatter);
         double lowPris = copy.getLast().sekPerKWh();
-        String lowPrisTidStart = copy.getLast().timeStart().format(onlyHourFormatter);
-        String lowPrisTidSlut = copy.getLast().timeEnd().format(onlyHourFormatter);
-        for (int i = 0; i < copy.size(); i++) {
-            sumPrice += copy.get(i).sekPerKWh();
+        //String lowPrisTidStart = copy.getLast().timeStart().format(onlyHourFormatter);
+        //String lowPrisTidSlut = copy.getLast().timeEnd().format(onlyHourFormatter);
+        if(copy.size()>48){
+            int indexSize = copy.size();
+            double totalSum = 0;
+            for (int i = 0; i < indexSize; i+=4) {
+                hourSum = 0;
+                for (int quarter = 0; quarter < 4; quarter++) {
+                    hourSum += copy.get(i+quarter).sekPerKWh();
+                }
+                hourAverage = hourSum / 4;
+                totalSum += hourAverage;
+                hourAverageList.add(new hourPriceAverage(hourAverage,copy.get(i).timeStart(),copy.get(i+3).timeEnd()));
+                //addera 4 timmar, div med 4
+            }
+            //addera sedan alla dessa medel till en hel, och dela det med 24.
+            avePrice = totalSum / 24;
+
+            //Kanske måste göra en record, varje 4 så sparas timmen också, sedan sortera eller hitta max/min borde rätt timme hänga med
+            //minValue = Collections.min(hourPriceAverage);
+        }else {
+            for (int i = 0; i < copy.size(); i++) {
+                sumPrice += copy.get(i).sekPerKWh();
+                hourAverageList.add(new hourPriceAverage(copy.get(i).sekPerKWh(),copy.get(i).timeStart(),copy.get(i).timeEnd()));
+            }
+            avePrice = sumPrice / copy.size();
+
         }
-        avePrice = sumPrice / copy.size();
-        double highPrisOre = highPris * 100;
-        double lowPrisOre = lowPris * 100;
+        maxValue = Collections.max(hourAverageList);
+        minValue = Collections.min(hourAverageList);
+        lowPrisTidStart = minValue.priceStart.format(onlyHourFormatter);
+        lowPrisTidSlut = minValue.priceEnd.format(onlyHourFormatter);
+        highPrisTidStart = maxValue.priceStart.format(onlyHourFormatter);
+        highPrisTidSlut = maxValue.priceEnd.format(onlyHourFormatter);
+
+
+        double highPrisOre = maxValue.hourAverage * 100;
+        double lowPrisOre = minValue.hourAverage * 100;
         double avePrisOre = avePrice * 100;
         return new priceStatistics(highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
     }
@@ -266,7 +320,7 @@ public class Main {
         System.out.printf("""
                 Högsta pris:  %.2f öre/kWh  Tid: %s-%s
                 Lägsta pris:  %.2f öre/kWh  Tid: %s-%s
-                Medelpris:    %.2f öre/kWh \n""", prices.highPrisOre, prices.highPrisTidStart, prices.highPrisTidSlut, prices.lowPrisOre, prices.lowPrisTidStart, prices.lowPrisTidSlut, prices.avePrisOre);
+                Medelpris: %.2f öre\n""", prices.highPrisOre, prices.highPrisTidStart, prices.highPrisTidSlut, prices.lowPrisOre, prices.lowPrisTidStart, prices.lowPrisTidSlut, prices.avePrisOre);
     }
 
     private static void pricePrinter(List<ElpriserAPI.Elpris> elpriser) {
@@ -304,6 +358,12 @@ public class Main {
 
     public record priceStatistics(double highPrisOre, String highPrisTidStart, String highPrisTidSlut,
                                   double lowPrisOre, String lowPrisTidStart, String lowPrisTidSlut, double avePrisOre) {
+    }
+    public record hourPriceAverage (double hourAverage, ZonedDateTime priceStart, ZonedDateTime priceEnd) implements Comparable<hourPriceAverage> {
+        @Override
+        public int compareTo(hourPriceAverage other) {
+            return Double.compare(this.hourAverage, other.hourAverage);
+        }
     }
 
 }
