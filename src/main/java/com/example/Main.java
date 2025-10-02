@@ -3,7 +3,6 @@ package com.example;
 import com.example.api.ElpriserAPI;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -22,12 +21,11 @@ public class Main {
     static int pricesFound;
     static String today;
     static LocalTime todayTime;
-    static LocalTime nextDayPublish = LocalTime.of(13, 0);
     static DateTimeFormatter onlyHourFormatter = DateTimeFormatter.ofPattern("HH");
     static DateTimeFormatter digitalFormatter = DateTimeFormatter.ofPattern("HH:mm");
     static DateTimeFormatter dayDate = DateTimeFormatter.ofPattern("dd/MM");
 
-    enum zoneChoise {SE1, SE2, SE3, SE4}
+    enum zoneChoice {SE1, SE2, SE3, SE4}
 
     static int window;
 
@@ -69,11 +67,11 @@ public class Main {
                         }
                         case "--charging" -> {
                             if (args.length > i + 1) {
-                                charginInput(args[i + 1]);
+                                chargingInput(args[i + 1]);
                                 i++;
                             } else {
                                 System.out.println("Missing charging window, using default");
-                                charginInput("default value");
+                                chargingInput("default value");
                             }
                         }
                         case "--date" -> {
@@ -82,7 +80,7 @@ public class Main {
                                 i++;
                             } else {
                                 System.out.println("Missing date argument");
-                                dateInput("faltyDate");
+                                dateInput("faultyDate");
                             }
                         }
                     }
@@ -98,9 +96,9 @@ public class Main {
             charingWindow();
         } else if (validDate && callSorted) {
             sortedList();
-        } else if (validDate && !callSorted) {
+        } else if (validDate) {
             unSortedList();
-        } else if (!validDate && callSorted) {
+        } else if (callSorted) {
             callDate = today;
             sortedList();
         } else if (!validDate && !callSorted) {
@@ -111,7 +109,7 @@ public class Main {
         }
     }
 
-    private static void charginInput(String arg) {
+    private static void chargingInput(String arg) {
         switch (arg) {
             case "8h" -> {
                 window = 8;
@@ -133,17 +131,16 @@ public class Main {
         }
     }
 
-    //TODO Om ordningen fuckar, lägg till/ta bort .reversed() på rad 141, elPrisLista.sort
     private static void sortedList() {
         List<ElpriserAPI.Elpris> elPrisLista = getPricesForMoreDays();
         if (elPrisLista.isEmpty()) {
             System.out.println("Inga priser funna");
         }
-        List quaterFix = quaterPriceFix(elPrisLista);
+        List<hourPriceAverage> quarterFix = quarterPriceFix(elPrisLista);
         priceStatistics result = getPriceStatistics(elPrisLista);
         highLowAvePrinter(result);
-        quaterFix.sort(Comparator.comparing(hourPriceAverage::hourAverage).reversed().thenComparing(hourPriceAverage::priceStart));//reversed för decending/ascending utan
-        quaterFixpricePrinter(quaterFix);
+        quarterFix.sort(Comparator.comparing(hourPriceAverage::hourAverage).reversed().thenComparing(hourPriceAverage::priceStart));//reversed för descending/ascending utan
+        quarterFixpricePrinter(quarterFix);
 
     }
 
@@ -154,10 +151,10 @@ public class Main {
             System.out.println("Inga priser funna");
             return;
         }
-        List quaterFix = quaterPriceFix(elPrisLista);
+        List<hourPriceAverage> quarterFix = quarterPriceFix(elPrisLista);
         priceStatistics result = getPriceStatistics(elPrisLista);
         highLowAvePrinter(result);
-        quaterFixpricePrinter(quaterFix);
+        quarterFixpricePrinter(quarterFix);
     }
 
     private static void dateInput(String arg) {
@@ -174,7 +171,7 @@ public class Main {
     private static void zoneInput(String arg) {
         arg = arg.toUpperCase();
         try {
-            zone = zoneChoise.valueOf(arg).toString();
+            zone = zoneChoice.valueOf(arg).toString();
             validZone = true;
         } catch (IllegalArgumentException e) {
             System.out.println("Invalid zone, Must choose between SE1,SE2,SE3,SE4. Type --help for more information.");
@@ -182,18 +179,20 @@ public class Main {
     }
 
     private static List<ElpriserAPI.Elpris> getPricesForMoreDays() {
-        String tomorrow = "";
+        String tomorrow;
         List<ElpriserAPI.Elpris> totalList = new ArrayList<>();
         if (!validDate) {
             List<ElpriserAPI.Elpris> todayList = getPriceList(today, zone);
             totalList.addAll(todayList);
+            System.out.println("Ingen data tillgänglig för idag.");
+
             if (callSorted) {
                 tomorrow = LocalDate.parse(today).plusDays(1).toString();
                 List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
                 totalList.addAll(tomorrowList);
+                System.out.println("Ingen data tillgänglig för imorgon.");
             }
             if (totalList.isEmpty()) {
-                System.out.println("Ingen data tillgänglig för morgondagen.");
                 return Collections.emptyList();
             }
             pricesFound = totalList.size();
@@ -205,7 +204,7 @@ public class Main {
             List<ElpriserAPI.Elpris> tomorrowList = getPriceList(tomorrow, zone);
             totalList.addAll(tomorrowList);
             if (totalList.isEmpty()) {
-                System.out.println("Ingen data tilgänglig");
+                System.out.println("Ingen data tillgänglig");
                 return Collections.emptyList();
             }
             pricesFound = totalList.size();
@@ -216,7 +215,7 @@ public class Main {
     private static void charingWindow() {
         List<ElpriserAPI.Elpris> priceList = getPricesForMoreDays();
         int length = priceList.size();
-        int beguinHour = 1;
+        int beginHour = 1;
         int stopHour;
         String startDate;
         String startHour;
@@ -234,42 +233,38 @@ public class Main {
             windowSum += priceList.get(i).sekPerKWh() - priceList.get(i - window).sekPerKWh();
             if (windowSum < minSum) {
                 minSum = windowSum;
-                beguinHour = i - window + 1;
+                beginHour = i - window + 1;
                 stopHour = i;
             }
         }
         aveSum = (minSum / window) * 100;
-        startDate = priceList.get(beguinHour).timeStart().format(dayDate);
-        startHour = priceList.get(beguinHour).timeStart().format(digitalFormatter);
+        startDate = priceList.get(beginHour).timeStart().format(dayDate);
+        startHour = priceList.get(beginHour).timeStart().format(digitalFormatter);
         endHour = priceList.get(stopHour).timeEnd().format(digitalFormatter);
         windowPrinter(startDate, startHour, endHour, aveSum);
     }
 
     private static List<ElpriserAPI.Elpris> getPriceList(String callDate, String zone) {
-        List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, com.example.api.ElpriserAPI.Prisklass.valueOf(zone));
+        List<ElpriserAPI.Elpris> testPriser = elAPI.getPriser(callDate, ElpriserAPI.Prisklass.valueOf(zone));
         if (testPriser.isEmpty()) {
-            System.out.println("No data found online.");
             return Collections.emptyList();
         }
         return testPriser;
     }
 
-    private static List quaterPriceFix(List<ElpriserAPI.Elpris> quaterList) {
+    private static List<hourPriceAverage> quarterPriceFix(List<ElpriserAPI.Elpris> quaterList) {
         List<hourPriceAverage> hourAverageList = new ArrayList<>();
         if (quaterList.size() > 48) {
-            double hourSum = 0;
-            double hourAverage = 0;
+            double hourSum;
+            double hourAverage;
             int indexSize = quaterList.size();
-            double totalSum = 0;
             for (int i = 0; i < indexSize; i += 4) {
                 hourSum = 0;
                 for (int quarter = 0; quarter < 4; quarter++) {
                     hourSum += quaterList.get(i + quarter).sekPerKWh();
                 }
                 hourAverage = hourSum / 4;
-                totalSum += hourAverage;
                 hourAverageList.add(new hourPriceAverage(hourAverage, quaterList.get(i).timeStart(), quaterList.get(i + 3).timeEnd()));
-                //addera 4 timmar, div med 4
             }
         return hourAverageList;
         } else {
@@ -281,56 +276,46 @@ public class Main {
     }
 
     private static priceStatistics getPriceStatistics(List<ElpriserAPI.Elpris> elpriser) {
-        List<ElpriserAPI.Elpris> copy = new ArrayList<>(elpriser);
         List<hourPriceAverage> hourAverageList = new ArrayList<>();
         double avePrice;
         double sumPrice = 0;
         double hourSum;
         double hourAverage;
-        hourPriceAverage maxValue = null;
-        hourPriceAverage minValue = null;
-        String lowPrisTidStart = "";
-        String lowPrisTidSlut = "";
-        String highPrisTidStart = "";
-        String highPrisTidSlut = "";
-        if (copy.size() > 48) {
-            int indexSize = copy.size();
+        hourPriceAverage maxValue;
+        hourPriceAverage minValue;
+        if (elpriser.size() > 48) {
+            int indexSize = elpriser.size();
             double totalSum = 0;
             for (int i = 0; i < indexSize; i += 4) {
                 hourSum = 0;
                 for (int quarter = 0; quarter < 4; quarter++) {
-                    hourSum += copy.get(i + quarter).sekPerKWh();
+                    hourSum += elpriser.get(i + quarter).sekPerKWh();
                 }
                 hourAverage = hourSum / 4;
                 totalSum += hourAverage;
-                hourAverageList.add(new hourPriceAverage(hourAverage, copy.get(i).timeStart(), copy.get(i + 3).timeEnd()));
-                //addera 4 timmar, div med 4
+                hourAverageList.add(new hourPriceAverage(hourAverage, elpriser.get(i).timeStart(), elpriser.get(i + 3).timeEnd()));
             }
-            //addera sedan alla dessa medel till en hel, och dela det med 24.
             avePrice = totalSum / 24;
-
-            //Kanske måste göra en record, varje 4 så sparas timmen också, sedan sortera eller hitta max/min borde rätt timme hänga med
-            //minValue = Collections.min(hourPriceAverage);
         } else {
-            for (int i = 0; i < copy.size(); i++) {
-                sumPrice += copy.get(i).sekPerKWh();
-                hourAverageList.add(new hourPriceAverage(copy.get(i).sekPerKWh(), copy.get(i).timeStart(), copy.get(i).timeEnd()));
+            for (int i = 0; i < elpriser.size(); i++) {
+                sumPrice += elpriser.get(i).sekPerKWh();
+                hourAverageList.add(new hourPriceAverage(elpriser.get(i).sekPerKWh(), elpriser.get(i).timeStart(), elpriser.get(i).timeEnd()));
             }
-            avePrice = sumPrice / copy.size();
+            avePrice = sumPrice / elpriser.size();
 
         }
         maxValue = Collections.max(hourAverageList);
         minValue = Collections.min(hourAverageList);
-        lowPrisTidStart = minValue.priceStart.format(onlyHourFormatter);
-        lowPrisTidSlut = minValue.priceEnd.format(onlyHourFormatter);
-        highPrisTidStart = maxValue.priceStart.format(onlyHourFormatter);
-        highPrisTidSlut = maxValue.priceEnd.format(onlyHourFormatter);
-
+        String lowPrisTidStart = minValue.priceStart.format(onlyHourFormatter);
+        String lowPrisTidSlut = minValue.priceEnd.format(onlyHourFormatter);
+        String highPrisTidStart = maxValue.priceStart.format(onlyHourFormatter);
+        String highPrisTidSlut = maxValue.priceEnd.format(onlyHourFormatter);
 
         double highPrisOre = maxValue.hourAverage * 100;
         double lowPrisOre = minValue.hourAverage * 100;
         double avePrisOre = avePrice * 100;
-        return new priceStatistics(highPrisOre, highPrisTidStart, highPrisTidSlut, lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
+        return new priceStatistics(highPrisOre, highPrisTidStart, highPrisTidSlut,
+                lowPrisOre, lowPrisTidStart, lowPrisTidSlut, avePrisOre);
     }
 
     private static void windowPrinter(String startDate, String startHour, String endHour, double aveSum) {
@@ -343,24 +328,18 @@ public class Main {
         System.out.printf("""
                 Högsta pris:  %.2f öre/kWh  Tid: %s-%s
                 Lägsta pris:  %.2f öre/kWh  Tid: %s-%s
-                Medelpris: %.2f öre\n""", prices.highPrisOre, prices.highPrisTidStart, prices.highPrisTidSlut, prices.lowPrisOre, prices.lowPrisTidStart, prices.lowPrisTidSlut, prices.avePrisOre);
+                Medelpris: %.2f öre\n""", prices.highPrisOre, prices.highPrisTidStart, prices.highPrisTidSlut,
+                prices.lowPrisOre, prices.lowPrisTidStart, prices.lowPrisTidSlut, prices.avePrisOre);
     }
 
-    private static void pricePrinter(List<ElpriserAPI.Elpris> elpriser) {
-        System.out.println("Priser funna för dagen: " + elpriser.size() + "\n");
-        elpriser.stream().forEach(pris ->
-                System.out.printf("""
-                                %s-%s %.2f öre\n""",
-                        pris.timeStart().format(onlyHourFormatter), pris.timeEnd().format(onlyHourFormatter), pris.sekPerKWh() * 100)
-        );
-    }//TODO testet gillar inte att det står något framför timeStart.
-    private static void quaterFixpricePrinter(List<hourPriceAverage> hourAverage) {
+    private static void quarterFixpricePrinter(List<hourPriceAverage> hourAverage) {
         System.out.println("Priser funna: " + pricesFound + "\n");
         hourAverage.stream().forEach(pris ->
                 System.out.printf("""
                                 %s
                                 %s-%s %.2f öre\n""",
-                        pris.priceStart.format(dayDate),pris.priceStart.format(onlyHourFormatter), pris.priceEnd.format(onlyHourFormatter), pris.hourAverage * 100)
+                        pris.priceStart.format(dayDate),pris.priceStart.format(onlyHourFormatter), pris.priceEnd.format(onlyHourFormatter),
+                        pris.hourAverage * 100)
         );
     }
 
@@ -371,15 +350,15 @@ public class Main {
                  To best usage of this program.
                 input zone is required SE1|SE2|SE3|SE4 with the argument --zone to get the right area.
                 Next date if you wish to see other than todays prices. Use --date with YYYY-MM-DD
-                Tomorrows prices are provied after 13:00.
+                Tomorrows prices are provided after 13:00.
                 
-                If you wish to see the list sorted in acending price order,
+                If you wish to see the list sorted in ascending price order,
                 include --sorted in the arguments. Otherwise it will be sorted by the hour.
                 
                 To know the best time to charge you car you can
                 input --charging with 2h|4h|8h representing time frame of 2, 4 or 6 hours
                 
-                Exampel of command
+                Example of command
                 --zone se2 --date 2025-09-20 --sorted
                 --zone se4 --sorted
                 --zone se3 --charging 4h
